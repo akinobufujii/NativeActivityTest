@@ -8,19 +8,25 @@
         android:targetSdkVersion="21" />
 
     <application
-        android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/AppTheme" >
+        android:hasCode="false">
+
         <activity
             android:name="android.app.NativeActivity"
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/app_name" >
 
-            <!-- Tell NativeActivity the name of or .so -->
+            <!-- .soファイルの名前と同一にする  -->
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="native-activity" />
+                android:value="NativeTest" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
         </activity>
     </application>
 

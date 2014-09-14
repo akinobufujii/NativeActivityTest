@@ -6,43 +6,93 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
-#define LOG_TAG ("gles2ndtest")
+#include <assert.h>
+
+#define LOG_TAG ("Android NativeActivity Test")
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__))
 #define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN,  LOG_TAG, __VA_ARGS__))
 #define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
 
-struct engine
+struct ApplicationData
 {
 	android_app* app;
 	EGLDisplay display;
 	EGLSurface surface;
 };
 
-const char gVertexShader[] = "attribute vec4 vPosition;\n"
-		"void main() {\n"
-		"  gl_Position = vPosition;\n"
-		"}\n";
+ApplicationData g_Application;
 
-const char gFragmentShader[] = "precision mediump float;\n"
-		"void main() {\n"
-		"  gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);\n"
-		"}\n";
-
-GLuint loadShader(GLenum shaderType, const char* pSource)
+// シェーダー読み込み
+GLuint loadShader(GLenum shaderType, const char* pSource, GLint* sourceLength = nullptr)
 {
+	// シェーダーコンパイル
 	GLuint shader = glCreateShader(shaderType);
-	glShaderSource(shader, 1, &pSource, nullptr);
+	glShaderSource(shader, 1, &pSource, sourceLength);
 	glCompileShader(shader);
-	GLint compiled;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+
+	// コンパイル結果をチェック
+	GLint compileResult;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compileResult);
+
+	if(compileResult == GL_FALSE)
+	{
+		// コンパイルが失敗したら、情報を吐き出す
+		GLint infoLength;
+		glGetShaderiv(shader, GL_SHADER_SOURCE_LENGTH, &infoLength);
+		if(infoLength > 0)
+		{
+			GLchar* info = new GLchar[infoLength];
+			glGetShaderInfoLog(shader, infoLength, nullptr, info);
+			LOGE("Shader Compile Error:\n%s" ,info);
+			delete info;
+		}
+		else
+		{
+			LOGE("Shader Compile Error No Info");
+		}
+	}
+
 	return shader;
+}
+
+// シェーダー読み込み(ファイルから)
+GLuint loadShaderFromFile(GLenum shaderType, const char* pSource)
+{
+	GLuint result = 0;
+
+	// assetsフォルダから指定されたファイルを読み込み
+	AAsset* asset = AAssetManager_open(g_Application.app->activity->assetManager, pSource,
+			AASSET_MODE_BUFFER);
+
+	if(asset)
+	{
+		// 実際にファイルが存在した時、読み込む
+		GLint filesize = AAsset_getLength(asset);
+		char* buffer = new char[filesize];
+
+		AAsset_read(asset, buffer, filesize);
+		AAsset_close(asset);
+
+		// コンパイル
+		result = loadShader(shaderType, buffer, &filesize);
+		delete buffer;
+	}
+	else
+	{
+		LOGE("Failed Shader File:%s\n", pSource);
+		assert(false);
+	}
+
+	return result;
 }
 
 GLuint createProgram(const char* pVertexSource, const char* pFragmentSource)
 {
-	GLuint vertexShader = loadShader(GL_VERTEX_SHADER, pVertexSource);
-	GLuint pixelShader = loadShader(GL_FRAGMENT_SHADER, pFragmentSource);
+	GLuint vertexShader = loadShaderFromFile(GL_VERTEX_SHADER, pVertexSource);
+	GLuint pixelShader = loadShaderFromFile(GL_FRAGMENT_SHADER,
+			pFragmentSource);
+
 	GLuint program = glCreateProgram();
 	glAttachShader(program, vertexShader);
 	glAttachShader(program, pixelShader);
@@ -52,7 +102,7 @@ GLuint createProgram(const char* pVertexSource, const char* pFragmentSource)
 	return program;
 }
 
-int init(engine* e)
+int init(ApplicationData* e)
 {
 	const EGLint attribs[] =
 	{
@@ -96,36 +146,43 @@ int init(engine* e)
 
 	glViewport(0, 0, w, h);
 
+	return 0;
+
 }
 
 // 描画
-void draw(engine* e)
+void draw(ApplicationData* e)
 {
-	GLuint gProgram = createProgram(gVertexShader, gFragmentShader);
+	GLuint gProgram = createProgram("shader/vertex/basic.vert",
+			"shader/fragment/basic.frag");
+
 	GLuint gvPositionHandle = glGetAttribLocation(gProgram, "vPosition");
 
+	// 今後拡張するためにTriangleリストで描画
 	const GLfloat vertices[] =
-	{ 0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f };
+	{ -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f,
+	   0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f};
 
-	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+	glClearColor(0.f, 0.f, 1.f, 1.f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUseProgram(gProgram);
 	glVertexAttribPointer(gvPositionHandle, 2, GL_FLOAT, GL_FALSE, 0, vertices);
 	glEnableVertexAttribArray(gvPositionHandle);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	eglSwapBuffers(e->display, e->surface);
 }
 
+// エントリーポイント
 void android_main(android_app* state)
 {
 	app_dummy();
 
-	engine e;
-	state->userData = &e;
+	g_Application.app = state;
+	state->userData = &g_Application;
 	state->onAppCmd = [](android_app* app, int32_t cmd)
 	{
-		auto e = static_cast<engine*>(app->userData);
+		auto e = static_cast<ApplicationData*>(app->userData);
 		switch (cmd)
 		{
 			case APP_CMD_INIT_WINDOW:
@@ -134,20 +191,21 @@ void android_main(android_app* state)
 			break;
 		}
 	};
-	e.app = state;
 
-	while (1)
+	int ident, events;
+	android_poll_source* source;
+
+	while (true)
 	{
-		int ident, events;
-		android_poll_source* source;
-		while ((ident = ALooper_pollAll(0, nullptr, &events, (void**) &source))
-				>= 0)
+		// イベントをポーリング
+		ident = ALooper_pollAll(0, nullptr, &events, reinterpret_cast<void**>(&source));
+		while (ident >= 0)
 		{
 			if (source != nullptr)
 			{
 				source->process(state, source);
 			}
-			if (state->destroyRequested != 0)
+			if (state->destroyRequested)
 			{
 				return;
 			}

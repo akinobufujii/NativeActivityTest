@@ -28,6 +28,9 @@
 								</outputEntries>
 							</builder>
 							<tool id="com.android.gcc.compiler.623766484" name="Android GCC Compiler" superClass="com.android.gcc.compiler">
+								<option id="com.android.gcc.option.includePath.1743977954" superClass="com.android.gcc.option.includePath" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;C:\AndroidNDK\android-ndk-r10\sources\cxx-stl\gnu-libstdc++\4.9\include&quot;"/>
+								</option>
 								<inputType id="com.android.gcc.inputType.2129520687" superClass="com.android.gcc.inputType"/>
 							</tool>
 						</toolChain>
@@ -56,4 +59,5 @@
 			<resource resourceType="PROJECT" workspacePath="/NativeTest"/>
 		</configuration>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
